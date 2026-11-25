@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; display: grid; place-items: center;
+    background: #1f2a44; font-family: "Segoe UI", system-ui, sans-serif; padding: 16px;
+  }
+  .calc {
+    width: 100%; max-width: 340px; background: #2b3a5c; border-radius: 22px;
+    padding: 18px; box-shadow: 0 18px 40px rgba(0,0,0,.35);
+  }
+  .screen {
+    background: #121a2e; border-radius: 14px; padding: 14px 16px; margin-bottom: 16px;
+    text-align: right; min-height: 96px; display: flex; flex-direction: column; justify-content: flex-end;
+    overflow: hidden;
+  }
+  #history { color: #8ea0c8; font-size: 1rem; min-height: 1.4em; word-break: break-all; }
+  #display { color: #fff; font-size: 2.2rem; font-weight: 600; word-break: break-all; }
+  #display.error { color: #ff7a7a; font-size: 1.4rem; }
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  button {
+    border: 0; border-radius: 12px; padding: 16px 0; font-size: 1.25rem; font-weight: 600;
+    cursor: pointer; background: #3a4d78; color: #fff; transition: transform .08s, filter .15s;
+  }
+  button:hover { filter: brightness(1.15); }
+  button:active { transform: scale(.94); }
+  button:focus-visible { outline: 3px solid #ffd166; outline-offset: 2px; }
+  .op { background: #f4a259; color: #1f2a44; }
+  .fn { background: #5c6f9c; }
+  .clear { background: #e5575b; }
+  .eq { background: #3fb68b; color: #08261c; grid-row: span 2; }
+  .zero { grid-column: span 2; }
+</style>
+</head>
+<body>
+  <div class="calc" role="application" aria-label="Calculator">
+    <div class="screen">
+      <div id="history"></div>
+      <div id="display" aria-live="polite">0</div>
+    </div>
+    <div class="keys">
+      <button class="clear" data-action="clear">C</button>
+      <button class="fn" data-action="delete">DEL</button>
+      <button class="op" data-op="÷">÷</button>
+      <button class="op" data-op="×">×</button>
+
+      <button data-num="7">7</button>
+      <button data-num="8">8</button>
+      <button data-num="9">9</button>
+      <button class="op" data-op="−">−</button>
+
+      <button data-num="4">4</button>
+      <button data-num="5">5</button>
+      <button data-num="6">6</button>
+      <button class="op" data-op="+">+</button>
+
+      <button data-num="1">1</button>
+      <button data-num="2">2</button>
+      <button data-num="3">3</button>
+      <button class="eq" data-action="equals">=</button>
+
+      <button class="zero" data-num="0">0</button>
+      <button data-num="." >.</button>
+    </div>
+  </div>
+
+<script>
+  const display = document.getElementById("display");
+  const historyEl = document.getElementById("history");
+
+  let current = "0";   // number being typed
+  let previous = null; // stored first operand
+  let operator = null;
+  let justEvaluated = false;
+
+  function render() {
+    display.classList.remove("error");
+    display.textContent = current;
+    historyEl.textContent = previous !== null ? `${previous} ${operator || ""}` : "";
+  }
+
+  function showError(msg) {
+    current = "0"; previous = null; operator = null; justEvaluated = true;
+    display.textContent = msg;
+    display.classList.add("error");
+    historyEl.textContent = "";
+  }
+
+  function appendNumber(n) {
+    if (justEvaluated) { current = "0"; justEvaluated = false; }
+    if (n === ".") {
+      if (current.includes(".")) return;
+      current += ".";
+    } else {
+      current = current === "0" ? n : current + n;
+    }
+    render();
+  }
+
+  function chooseOperator(op) {
+    if (operator && !justEvaluated && previous !== null) {
+      if (!evaluate()) return;
+    }
+    previous = current;
+    operator = op;
+    current = "0";
+    justEvaluated = false;
+    render();
+  }
+
+  function compute(a, b, op) {
+    switch (op) {
+      case "+": return a + b;
+      case "−": return a - b;
+      case "×": return a * b;
+      case "÷": return b === 0 ? null : a / b;
+    }
+  }
+
+  function evaluate() {
+    if (operator === null || previous === null) return true;
+    const a = parseFloat(previous), b = parseFloat(current);
+    const result = compute(a, b, operator);
+    if (result === null) { showError("Cannot divide by zero"); return false; }
+    current = String(parseFloat(result.toFixed(10)));
+    previous = null; operator = null; justEvaluated = true;
+    render();
+    return true;
+  }
+
+  function del() {
+    if (justEvaluated) return;
+    current = current.length > 1 ? current.slice(0, -1) : "0";
+    render();
+  }
+
+  function clearAll() {
+    current = "0"; previous = null; operator = null; justEvaluated = false;
+    render();
+  }
+
+  document.querySelector(".keys").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.num !== undefined) appendNumber(b.dataset.num);
+    else if (b.dataset.op) chooseOperator(b.dataset.op);
+    else if (b.dataset.action === "equals") evaluate();
+    else if (b.dataset.action === "delete") del();
+    else if (b.dataset.action === "clear") clearAll();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (/^[0-9.]$/.test(e.key)) appendNumber(e.key);
+    else if (e.key === "+") chooseOperator("+");
+    else if (e.key === "-") chooseOperator("−");
+    else if (e.key === "*") chooseOperator("×");
+    else if (e.key === "/") { e.preventDefault(); chooseOperator("÷"); }
+    else if (e.key === "Enter" || e.key === "=") { e.preventDefault(); evaluate(); }
+    else if (e.key === "Backspace") del();
+    else if (e.key === "Escape") clearAll();
+  });
+</script>
+</body>
+</html>
